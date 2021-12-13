@@ -12,6 +12,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import re
 import scoring
 from typing import Dict, Tuple, Any
+from weakref import WeakKeyDictionary
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -47,7 +48,7 @@ class BaseField(metaclass=abc.ABCMeta):
     def __init__(self, required=False, nullable=False):
         self.required = required
         self.nullable = nullable
-        self.data = dict()
+        self.data = WeakKeyDictionary()
 
     def __set_name__(self, owner, name):
         self.name = name
@@ -59,31 +60,31 @@ class BaseField(metaclass=abc.ABCMeta):
         return self.data.get(instance)
 
     @abc.abstractmethod
-    def checking_field(self, value):
+    def check_field(self, value):
         pass
 
 
 class IntField(BaseField):
-    def checking_field(self, value):
+    def check_field(self, value):
         if not isinstance(value, int):
             raise FieldValidationError('Incorrect field type. Field is not a int. Value %s' % value)
 
 
 class ListField(BaseField):
-    def checking_field(self, value):
+    def check_field(self, value):
         if not isinstance(value, list):
             raise FieldValidationError('Incorrect field type. Field is not a list')
 
 
 class CharField(BaseField):
-    def checking_field(self, value):
+    def check_field(self, value):
         if not isinstance(value, str):
             raise FieldValidationError('Incorrect field type. Field is not a string. Value %s' % value)
 
 
 class DateField(CharField):
-    def checking_field(self, value):
-        super(DateField, self).checking_field(value)
+    def check_field(self, value):
+        super(DateField, self).check_field(value)
         try:
             datetime.datetime.strptime(value, '%d.%m.%Y')
         except (ValueError, TypeError):
@@ -91,20 +92,20 @@ class DateField(CharField):
 
 
 class ArgumentsField(BaseField):
-    def checking_field(self, value):
+    def check_field(self, value):
         if not isinstance(value, dict):
             raise FieldValidationError('Incorrect field type. Field is not a dict. Value %s' % value)
 
 
 class EmailField(CharField):
-    def checking_field(self, value):
-        super(EmailField, self).checking_field(value)
+    def check_field(self, value):
+        super(EmailField, self).check_field(value)
         if not re.match(r'^[\w\.-]+@[\w\.-]+[.]\w{2,3}$', value):
             raise FieldValidationError('Email field format error. Symbol @ not found. Value %s' % value)
 
 
 class PhoneField(BaseField):
-    def checking_field(self, value):
+    def check_field(self, value):
         if not re.match(r'^7[0-9]{10}$', str(value)):
             raise FieldValidationError(
                 'Phone field format error. The length must be equal to 11 symbols and start with 7. Value %s' % value
@@ -114,8 +115,8 @@ class PhoneField(BaseField):
 class BirthDayField(DateField):
     MAX_AGE = 70
 
-    def checking_field(self, value):
-        super(BirthDayField, self).checking_field(value)
+    def check_field(self, value):
+        super(BirthDayField, self).check_field(value)
         date_birthday = datetime.datetime.strptime(value, '%d.%m.%Y')
         if datetime.datetime.now().year - date_birthday.year > self.MAX_AGE:
             raise FieldValidationError('Birthday field error. The age cannot be more than 70. Value %s' % value)
@@ -124,15 +125,15 @@ class BirthDayField(DateField):
 
 
 class GenderField(IntField):
-    def checking_field(self, value):
-        super(GenderField, self).checking_field(value)
+    def check_field(self, value):
+        super(GenderField, self).check_field(value)
         if value not in GENDERS.keys():
             raise FieldValidationError('Gender field error. The value must be 0, 1 or 2. Value %s' % value)
 
 
 class ClientIDsField(ListField):
-    def checking_field(self, value):
-        super(ClientIDsField, self).checking_field(value)
+    def check_field(self, value):
+        super(ClientIDsField, self).check_field(value)
         for v in value:
             if not isinstance(v, int):
                 raise FieldValidationError('Incorrect field type. Field must be a list of int')
@@ -149,7 +150,7 @@ class BaseRequest(object):
         for field in self.fields:
             setattr(self, field, kwargs.get(field))
 
-    def validation_request(self):
+    def validate_request(self):
         errors_string = ''
         for name in self.fields:
             field = self.__class__.__dict__.get(name)
@@ -166,7 +167,7 @@ class BaseRequest(object):
 
             if value not in (None, "", (), [], {}):
                 try:
-                    field.checking_field(value)
+                    field.check_field(value)
                 except FieldValidationError as e:
                     errors_string += 'Field validation error. Field %s. Error:  %s.' % (name, str(e))
 
@@ -187,8 +188,8 @@ class OnlineScoreRequest(BaseRequest):
     birthday = BirthDayField(required=False, nullable=True)
     gender = GenderField(required=False, nullable=True)
 
-    def validation_request(self):
-        super(OnlineScoreRequest, self).validation_request()
+    def validate_request(self):
+        super(OnlineScoreRequest, self).validate_request()
         if not (
             (self.phone and self.email)
             or (self.first_name and self.last_name)
@@ -221,7 +222,7 @@ def check_auth(request):
 
 def clients_interest_handler(request: Dict[str, Dict], ctx: Dict[str, Any], store) -> Tuple[Dict[str, Any], int]:
     ci_req = ClientsInterestsRequest(**request.arguments)
-    ci_req.validation_request()
+    ci_req.validate_request()
 
     ctx['nclients'] = len(ci_req.client_ids)
 
@@ -231,7 +232,7 @@ def clients_interest_handler(request: Dict[str, Dict], ctx: Dict[str, Any], stor
 
 def online_score_handler(request: Dict[str, Dict], ctx: Dict[str, Any], store) -> Tuple[Dict[str, Any], int]:
     os_req = OnlineScoreRequest(**request.arguments)
-    os_req.validation_request()
+    os_req.validate_request()
 
     ctx['has'] = [name for name in os_req.fields if getattr(os_req, name) is not None]
 
@@ -259,7 +260,7 @@ def method_handler(request, ctx, store):
 
     try:
         method_request = MethodRequest(**request_dict)
-        method_request.validation_request()
+        method_request.validate_request()
     except FieldValidationError as e:
         logging.exception(e)
         return str(e), INVALID_REQUEST
