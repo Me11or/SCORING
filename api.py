@@ -13,6 +13,7 @@ import re
 import scoring
 from typing import Dict, Tuple, Any
 from weakref import WeakKeyDictionary
+from store import Store
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -241,7 +242,7 @@ def online_score_handler(request: Dict[str, Dict], ctx: Dict[str, Any], store) -
     else:
         score = scoring.get_score(
             store=store,
-            phone=os_req.phone,
+            phone=str(os_req.phone),
             email=os_req.email,
             birthday=os_req.birthday,
             gender=os_req.gender,
@@ -282,7 +283,7 @@ def method_handler(request, ctx, store):
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {"method": method_handler}
-    store = None
+    store = Store(socket_connect_timeout=30)
 
     def get_request_id(self, headers):
         return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)
@@ -333,6 +334,7 @@ if __name__ == "__main__":
         format='[%(asctime)s] %(levelname).1s %(message)s',
         datefmt='%Y.%m.%d %H:%M:%S',
     )
+    MainHTTPHandler.store.connect()
     server = HTTPServer(("localhost", opts.port), MainHTTPHandler)
     logging.info("Starting server at %s" % opts.port)
     try:
