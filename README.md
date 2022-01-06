@@ -54,5 +54,10 @@
 "d3573aff1555cd67dccf21b95fe8c4dc8732f33fd4e32461b7fe6a71d83c947688515e36774c00fb630b039fe2223c991f045f13f240913860502
 "arguments": {"client_ids": [1,2,3,4], "date": "20.07.2017"}}' http://127.0.0.1:8080/method/
 
+Команды для тестирования:
+- python3 -m unittest discover tests/functional -v
+- python3 -m unittest discover tests/integration -v
+- python3 -m unittest discover tests/unit -v
+
     
 <h3 dir="auto"><g-emoji class="g-emoji" alias="books" fallback-src="https://github.githubassets.com/images/icons/emoji/unicode/1f4da.png">📚</g-emoji><strong>Домашнее задание разработано для курса "<a href="https://otus.ru/lessons/python-professional/" rel="nofollow">Python Developer. Professional</a>"</strong></h3>
