@@ -7,7 +7,7 @@ MAX_RETRY = 3
 RETRY_DELAY = 0.1
 
 
-def retry_whith_raise_control(raise_on_failure=True):
+def retry_with_raise_control(raise_on_failure=True):
     def retry_decorator(func):
         def wrapper(*args, **kwargs):
             last_exception = None
@@ -31,14 +31,10 @@ def retry_whith_raise_control(raise_on_failure=True):
 
 
 class Store(object):
-
-    client = None
-    params = {}
-
     def __init__(self, **kwargs):
         self.params = kwargs
 
-    @retry_whith_raise_control(raise_on_failure=True)
+    @retry_with_raise_control(raise_on_failure=True)
     def connect(self):
         self.client = redis.Redis(**self.params)
         self.client.ping()
@@ -46,18 +42,18 @@ class Store(object):
     def close(self):
         self.client.close()
 
-    @retry_whith_raise_control(raise_on_failure=True)
+    @retry_with_raise_control(raise_on_failure=True)
     def set(self, key, *values):
         return self.client.sadd(key, *values)
 
-    @retry_whith_raise_control(raise_on_failure=False)
+    @retry_with_raise_control(raise_on_failure=False)
     def cache_set(self, key, value, expire):
         return self.client.set(key, value, ex=expire)
 
-    @retry_whith_raise_control(raise_on_failure=True)
+    @retry_with_raise_control(raise_on_failure=True)
     def get(self, key):
         return self.client.smembers(key)
 
-    @retry_whith_raise_control(raise_on_failure=False)
+    @retry_with_raise_control(raise_on_failure=False)
     def cache_get(self, key):
         return self.client.get(key)
